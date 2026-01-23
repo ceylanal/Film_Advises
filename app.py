@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -6,9 +5,7 @@ from io import StringIO
 import os
 
 
-
-# Gömülü Veri Seti (CSV dosyasındaki gerçek veriler ve Top 10 için atanmış poster yolları)
-CSV_DATA = """Const,Your Rating,Date Rated,Title,Original Title,URL,Title Type,IMDb Rating,Runtime (mins),Year,Genres,Num Votes,Release Date,Directors,poster_path
+CSV_DATA = CSV_DATA = """Const,Your Rating,Date Rated,Title,Original Title,URL,Title Type,IMDb Rating,Runtime (mins),Year,Genres,Num Votes,Release Date,Directors,poster_path
 tt0133093,9,2026-01-01,"Matrix","The Matrix",https://www.imdb.com/title/tt0133093,Movie,8.7,136,1999,"Action, Sci-Fi",2215161,"1999-09-03","Lana Wachowski,Lilly Wachowski"
 tt0276919,8,2025-12-21,"Kibirli Kasaba","Dogville",https://www.imdb.com/title/tt0276919,Movie,8.0,171,2003,"Drama, Crime",167053,"2003-12-05","Lars von Trier"
 tt1596345,7,2025-10-26,"Şah Mat","Pawn Sacrifice",https://www.imdb.com/title/tt1596345,Movie,7.0,115,2014,"Drama, Biography, Sport, Thriller, History",53517,"2015-10-02","Edward Zwick"
@@ -215,7 +212,20 @@ tt0419887,9,2023-09-12,"Uçurtma avcısı","The Kite Runner",https://www.imdb.co
 tt1571401,9,2023-09-12,"Die Vermessung der Welt","Die Vermessung der Welt",https://www.imdb.com/title/tt1571401,Movie,5.7,119,2012,"Drama, Biography, History",3343,"2012-10-25","Detlev Buck"
 tt11813216,9,2023-09-12,"The Banshees of Inisherin","The Banshees of Inisherin",https://www.imdb.com/title/tt11813216,Movie,7.7,114,2022,"Drama, Comedy",289633,"2023-02-03","Martin McDonagh"
 """
-# Top 10 için kısa açıklamalar (IMDb ID -> 1 cümle)
+
+TOP10_POSTER_MAP = {
+    "tt0476735": "assets/posters/babamveoglum.jpg",
+    "tt4034228": "assets/posters/yasaminkiyisindaa.jpg",
+    "tt0346094": "assets/posters/uzak.jpg",
+    "tt21029674": "assets/posters/cezailer.jpg",
+    "tt0112471": "assets/posters/gündogmadan.jpg",
+    "tt1355644": "assets/posters/passengers.jpg",
+    "tt0110912": "assets/posters/pulpfiction.jpg",
+    "tt1586680": "assets/posters/shameless.jpg",
+    "tt0248654": "assets/posters/sixfeetunder.jpg",
+    "tt6628102": "assets/posters/ahlatagaci.jpg",
+}
+
 TOP10_DESCRIPTION_MAP = {
     "tt0476735": "Bir baba ile oğulun yıllara yayılan, yürek burkan hikâyesi.",
     "tt4034228": "Kaybın ardından gelen sessizlik ve yas üzerine derin bir drama.",
@@ -229,82 +239,154 @@ TOP10_DESCRIPTION_MAP = {
     "tt6628102": "Taşrada sıkışmışlık, entelektüel çatışma ve içsel arayış."
 }
 
-# Plotly grafiklerini tamamen statik yapmak için ortak config
 PLOTLY_STATIC_CONFIG = {
-    "displayModeBar": False,   # Zoom / pan butonları kalkar
-    "scrollZoom": False,       # Mouse wheel zoom kapalı
-    "doubleClick": False,      # Çift tık reset kapalı
-    "staticPlot": True         # TÜM etkileşimleri kapatır (en garanti)
+    "displayModeBar": False,
+    "scrollZoom": False,
+    "doubleClick": False,
+    "staticPlot": True
 }
 
-
-
-
-# Mobil uyumluluk: sidebar varsayılan kapalı
-st.set_page_config(page_title="Film Oylama Dashboard", layout="wide", initial_sidebar_state="collapsed")
-
-# Sadece Top 10 için manuel poster eşlemesi (IMDb ID -> lokal yol)
-TOP10_POSTER_MAP = {
-    "tt0476735":"assets/posters/babamveoglum.jpg",
-    "tt4034228":"assets/posters/yasaminkiyisindaa.jpg",
-    "tt0346094":"assets/posters/uzak.jpg",
-    "tt21029674": "assets/posters/cezailer.jpg",
-    "tt0112471": "assets/posters/gündogmadan.jpg",
-    "tt1355644":"assets/posters/passengers.jpg",
-    "tt0110912":"assets/posters/pulpfiction.jpg",
-    "tt1586680":"assets/posters/shameless.jpg",
-    "tt0248654":"assets/posters/sixfeetunder.jpg",
-    "tt6628102":"assets/posters/ahlatagaci.jpg",
-}
+st.set_page_config(
+    page_title="Film Oylama Dashboard",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
 def stil_enjekte_et():
-    """Mobil uyumlu CSS: küçük ekranda kolonları stack’le, container padding ve metrikleri optimize et."""
     st.markdown("""
-        <style>
-            /* Sidebar genişlikleri desktop için aynı kalsın */
-            [data-testid="stSidebar"] {
-                min-width: 280px;
-                max-width: 320px;
-            }
+    <style>
+    /* ========== GENEL SAYFA ========== */
+    html, body, [class*="css"]  {
+        font-family: "Inter", "Segoe UI", sans-serif;
+        background-color: #0e1117;
+        color: #e6edf3;
+    }
 
-            /* Metrik kartları */
-            [data-testid="stMetric"] {
-                background-color: rgba(255, 255, 255, 0.05);
-                padding: 12px;
-                border-radius: 10px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            }
+    /* Sayfa padding */
+    .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
 
-            /* Posterler */
-            div[data-testid="column"] img {
-                border-radius: 8px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-                object-fit: cover;
-            }
+    /* ========== SIDEBAR ========== */
+    [data-testid="stSidebar"] {
+        background-color: #0b0e14;
+        border-right: 1px solid rgba(255,255,255,0.06);
+    }
 
-            /* Mobil: genel padding biraz azalt */
-            @media (max-width: 768px) {
-                .block-container {
-                    padding-left: 1rem;
-                    padding-right: 1rem;
-                }
-            }
-        </style>
+    /* ========== BAŞLIKLAR ========== */
+    h1, h2, h3 {
+        font-weight: 600;
+        letter-spacing: -0.3px;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    h2 {
+        font-size: 1.4rem;
+    }
+
+    /* ========== KARTLAR (container border=True) ========== */
+    div[data-testid="stVerticalBlock"] div:has(> div[data-testid="stContainer"]) {
+        background-color: #161b22;
+        border-radius: 14px;
+        padding: 12px;
+        border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ========== METRIC ========== */
+    [data-testid="stMetric"] {
+        background: linear-gradient(
+            135deg,
+            rgba(245,197,24,0.15),
+            rgba(22,27,34,0.8)
+        );
+        border-radius: 12px;
+        padding: 14px;
+        border: 1px solid rgba(245,197,24,0.35);
+    }
+
+    [data-testid="stMetricValue"] {
+        color: #f5c518;
+        font-weight: 700;
+    }
+
+    /* ========== POSTERLER ========== */
+    img {
+        border-radius: 10px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.45);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    img:hover {
+        transform: scale(1.03);
+        box-shadow: 0 18px 40px rgba(0,0,0,0.6);
+    }
+
+    /* ========== TAB BAR ========== */
+    button[data-baseweb="tab"] {
+        background-color: transparent;
+        color: #9ba3af;
+        font-weight: 500;
+        border-radius: 8px;
+        padding: 8px 14px;
+    }
+
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #161b22;
+        color: #e6edf3;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* ========== TABLO ========== */
+    table {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    thead tr {
+        background-color: #161b22;
+    }
+
+    tbody tr:nth-child(even) {
+        background-color: rgba(255,255,255,0.02);
+    }
+
+    /* ========== KÜÇÜK METİNLER ========== */
+    .stCaption, small {
+        color: #9ba3af;
+    }
+
+    /* ========== MOBİL İYİLEŞTİRME ========== */
+    @media (max-width: 768px) {
+        h1 {
+            font-size: 1.6rem;
+        }
+
+        img {
+            max-width: 100%;
+        }
+    }
+    </style>
     """, unsafe_allow_html=True)
+
 
 @st.cache_data(show_spinner=False)
 def veri_yukle_cached():
-    """CSV parse işlemi pahalı: cache."""
     return pd.read_csv(StringIO(CSV_DATA))
 
 @st.cache_data(show_spinner=False)
 def kolon_tespit_et_cached(df: pd.DataFrame):
-    """Kolon tespiti cache."""
     df = df.copy()
 
     puan_kolonu = next((c for c in df.columns if 'your rating' in c.lower()), None)
     if not puan_kolonu:
-        puan_kolonu = next((c for c in df.columns if ('puan' in c.lower() or 'rating' in c.lower()) and 'imdb' not in c.lower()), None)
+        puan_kolonu = next(
+            (c for c in df.columns if ('puan' in c.lower() or 'rating' in c.lower()) and 'imdb' not in c.lower()),
+            None
+        )
 
     tespit_edilenler = {
         'id': next((c for c in df.columns if c.lower() in ['const', 'imdb id', 'imdbid', 'tconst']), None),
@@ -344,7 +426,7 @@ def sidebar_filtreleri(df, kolonlar):
 
     if kolonlar['tur']:
         tur_serisi = df[kolonlar['tur']].fillna("Bilinmiyor").astype(str)
-        tekil_turler = sorted(list(set([t.strip() for satır in tur_serisi for t in satır.split(',') if t.strip()])))
+        tekil_turler = sorted(list(set([t.strip() for satir in tur_serisi for t in satir.split(',') if t.strip()])))
         secilen_turler = st.sidebar.multiselect("Film Türleri", tekil_turler)
         if secilen_turler:
             maske = f_df[kolonlar['tur']].astype(str).apply(lambda x: any(t in x for t in secilen_turler))
@@ -352,30 +434,28 @@ def sidebar_filtreleri(df, kolonlar):
 
     return f_df
 
+def dashboard_metrikleri(df, kolonlar):
+    if kolonlar['puan'] and not df.empty:
+        ort_puan = df[kolonlar['puan']].mean()
+        st.metric(label="Filtrelenmiş Veri Ortalama Puanı (Your Rating)", value=f"{ort_puan:.2f}")
+
 def dashboard_grafikleri(df, kolonlar):
     if df.empty:
+        st.warning("Grafik oluşturmak için veri bulunamadı.")
         return
 
-    # --- Puan Dağılımı ---
     if kolonlar['puan']:
         st.subheader("Puan Dağılımı")
         fig_hist = px.histogram(
-            df,
-            x=kolonlar['puan'],
-            nbins=20,
+            df, x=kolonlar['puan'], nbins=20,
             labels={kolonlar['puan']: 'Puan'},
             template="plotly_dark"
         )
         fig_hist.update_layout(bargap=0.1)
-        st.plotly_chart(
-            fig_hist,
-            use_container_width=True,
-            config=PLOTLY_STATIC_CONFIG
-        )
+        st.plotly_chart(fig_hist, use_container_width=True, config=PLOTLY_STATIC_CONFIG)
 
     col1, col2 = st.columns(2)
 
-    # --- Yıllara Göre Ortalama Puan ---
     if kolonlar['yil'] and kolonlar['puan']:
         with col1:
             st.subheader("Yıllara Göre Ortalama Puan")
@@ -387,19 +467,11 @@ def dashboard_grafikleri(df, kolonlar):
                     x=kolonlar['yil'],
                     y=kolonlar['puan'],
                     markers=True,
-                    labels={
-                        kolonlar['yil']: 'Yıl',
-                        kolonlar['puan']: 'Ortalama Puan'
-                    },
+                    labels={kolonlar['yil']: 'Yıl', kolonlar['puan']: 'Ortalama Puan'},
                     template="plotly_dark"
                 )
-                st.plotly_chart(
-                    fig_yil,
-                    use_container_width=True,
-                    config=PLOTLY_STATIC_CONFIG
-                )
+                st.plotly_chart(fig_yil, use_container_width=True, config=PLOTLY_STATIC_CONFIG)
 
-    # --- Türlere Göre Ortalama Puan ---
     if kolonlar['tur'] and kolonlar['puan']:
         with col2:
             st.subheader("Türlere Göre Ortalama Puan")
@@ -409,37 +481,17 @@ def dashboard_grafikleri(df, kolonlar):
             tur_df = tur_df.explode('gecici_tur')
             tur_df['gecici_tur'] = tur_df['gecici_tur'].str.strip()
             tur_df = tur_df[tur_df['gecici_tur'] != ""]
-
             if not tur_df.empty:
-                tur_gruplu = (
-                    tur_df
-                    .groupby('gecici_tur')[kolonlar['puan']]
-                    .mean()
-                    .reset_index()
-                    .sort_values(by=kolonlar['puan'], ascending=False)
-                )
-
+                tur_gruplu = tur_df.groupby('gecici_tur')[kolonlar['puan']].mean().reset_index()
+                tur_gruplu = tur_gruplu.sort_values(by=kolonlar['puan'], ascending=False)
                 fig_tur = px.bar(
                     tur_gruplu,
                     x='gecici_tur',
                     y=kolonlar['puan'],
-                    labels={
-                        'gecici_tur': 'Tür',
-                        kolonlar['puan']: 'Ortalama Puan'
-                    },
+                    labels={'gecici_tur': 'Tür', kolonlar['puan']: 'Ortalama Puan'},
                     template="plotly_dark"
                 )
-
-                st.plotly_chart(
-                    fig_tur,
-                    use_container_width=True,
-                    config=PLOTLY_STATIC_CONFIG
-                )
-
-def dashboard_metrikleri(df, kolonlar):
-    if kolonlar['puan'] and not df.empty:
-        ort_puan = df[kolonlar['puan']].mean()
-        st.metric(label="Filtrelenmiş Veri Ortalama Puanı (Your Rating)", value=f"{ort_puan:.2f}")
+                st.plotly_chart(fig_tur, use_container_width=True, config=PLOTLY_STATIC_CONFIG)
 
 def get_poster_source_for_top10(imdb_id: str) -> str:
     fallback = "https://via.placeholder.com/150x220?text=No+Poster"
@@ -450,130 +502,85 @@ def get_poster_source_for_top10(imdb_id: str) -> str:
         return path
     return fallback
 
-def _get_device_mode():
-    """
-    Streamlit JS ile gerçek ekran genişliğini okumak standart şekilde mümkün değil.
-    Bu nedenle basit bir mobil modu seçicisi ekliyoruz (varsayılan Auto).
-    Auto: geniş ekran mantığı; Mobil: tek kolon ağırlıklı.
-    """
-    with st.sidebar:
-        st.markdown("---")
-        mode = st.radio("Görünüm", ["Auto", "Mobil"], index=0, horizontal=True)
-    return mode
+def get_top10_description(imdb_id: str) -> str:
+    if not isinstance(imdb_id, str):
+        return ""
+    return TOP10_DESCRIPTION_MAP.get(imdb_id.strip(), "")
 
-def dashboard_tablolar(df, kolonlar, view_mode: str):
-    """
-    KURAL:
-    - Top 10: Poster GÖSTER.
-    - Veri Listesi: Poster ASLA GÖSTERME.
-    Mobil optimizasyon:
-    - Top10: Auto=4 kolon, Mobil=2 kolon (çok dar ekranda 1)
-    - Veri listesi: Mobilde tek kolon (bilgi + puan alt alta)
-    """
+def sekme_top_bottom(df, kolonlar):
+    if df.empty or not kolonlar['puan']:
+        st.warning("Top/Bottom listesi için uygun veri bulunamadı.")
+        return
 
-    if kolonlar['puan'] and not df.empty:
-        st.subheader("En Yüksek Puan Verdiğim 10 Film/Diziler")
-        top_10 = df.sort_values(by=kolonlar['puan'], ascending=False).head(10)
+    st.subheader("En Yüksek Puanlı 10 İçerik")
+    top_10 = df.sort_values(by=kolonlar['puan'], ascending=False).head(10)
 
-        # Mobilde daha az kolon
-        if view_mode == "Mobil":
-            row_size = 2
-        else:
-            row_size = 4
+    ROW_SIZE = 4
+    for i in range(0, len(top_10), ROW_SIZE):
+        grid_cols = st.columns(ROW_SIZE)
+        batch = top_10.iloc[i:i + ROW_SIZE]
 
-        for i in range(0, len(top_10), row_size):
-            grid_cols = st.columns(row_size)
-            batch = top_10.iloc[i:i + row_size]
+        for idx, (_, row) in enumerate(batch.iterrows()):
+            with grid_cols[idx]:
+                with st.container(border=True):
+                    imdb_id = row.get(kolonlar['id']) if kolonlar['id'] else None
+                    imdb_id_str = str(imdb_id) if imdb_id is not None else ""
 
-            for idx, (_, row) in enumerate(batch.iterrows()):
-                with grid_cols[idx]:
-                    with st.container(border=True):
-                        imdb_id = row.get(kolonlar['id']) if kolonlar['id'] else None
-                        img_src = get_poster_source_for_top10(str(imdb_id) if imdb_id is not None else "")
-                        st.image(img_src, width=150, use_container_width=False)
-                        st.markdown(f"**{row[kolonlar['isim']]}**")
-                        st.caption(f"⭐ {row[kolonlar['puan']]:.1f}")
-                        # Kısa açıklama (sadece Top 10)
-                        desc = TOP10_DESCRIPTION_MAP.get(str(imdb_id), "")
-    if desc:
-        st.caption(desc)
+                    img_src = get_poster_source_for_top10(imdb_id_str)
+                    st.image(img_src, width=150, use_container_width=False)
 
+                    st.markdown(f"**{row[kolonlar['isim']]}**")
+                    st.caption(f"⭐ {row[kolonlar['puan']]:.1f}")
+
+                    aciklama = get_top10_description(imdb_id_str)
+                    if aciklama:
+                        st.caption(aciklama)
 
     st.markdown("---")
-
-    st.subheader("En düşük puan verdiklerim")
+    st.subheader("En Düşük Puanlı 10 İçerik")
     bottom_10 = df.sort_values(by=kolonlar['puan'], ascending=True).head(10)
     st.table(bottom_10[[kolonlar['isim'], kolonlar['puan']]])
 
-    st.markdown("---")
-    st.subheader("TÜM OYLADIĞIM FİLMLER ve DİZİLER")
+def sekme_tum_liste(df, kolonlar):
+    st.subheader("Veri Listesi")
+    if df.empty:
+        st.warning("Gösterilecek veri bulunamadı.")
+        return
 
-    if not df.empty:
-        for _, row in df.iterrows():
-            with st.container(border=True):
+    for _, row in df.iterrows():
+        with st.container(border=True):
+            col_info, col_rate = st.columns([5, 1])
 
-                # Mobilde stacked layout
-                if view_mode == "Mobil":
-                    # Bilgi
-                    baslik = row[kolonlar['isim']]
-                    orijinal_baslik = None
-                    if kolonlar['orijinal_isim'] and pd.notna(row[kolonlar['orijinal_isim']]):
-                        orijinal_baslik = row[kolonlar['orijinal_isim']]
+            with col_info:
+                baslik = row[kolonlar['isim']]
+                orijinal_baslik = None
+                if kolonlar['orijinal_isim'] and pd.notna(row.get(kolonlar['orijinal_isim'])):
+                    orijinal_baslik = row[kolonlar['orijinal_isim']]
 
-                    if orijinal_baslik and str(orijinal_baslik) != str(baslik):
-                        st.markdown(f"**{orijinal_baslik}**")
-                        st.caption(f"{baslik}")
-                    else:
-                        st.markdown(f"**{baslik}**")
-
-                    meta = []
-                    if kolonlar['yil'] and pd.notna(row[kolonlar['yil']]):
-                        meta.append(str(int(row[kolonlar['yil']])))
-                    if kolonlar['tur']:
-                        meta.append(str(row[kolonlar['tur']]))
-                    if meta:
-                        st.text(" • ".join(meta))
-
-                    # Puan alt satıra
-                    if kolonlar['puan']:
-                        st.metric("Puan", f"{row[kolonlar['puan']]:.1f}")
-
+                if orijinal_baslik and str(orijinal_baslik) != str(baslik):
+                    st.markdown(f"**{orijinal_baslik}**")
+                    st.caption(f"{baslik}")
                 else:
-                    # Desktop (mevcut davranış korunur)
-                    col_info, col_rate = st.columns([5, 1])
+                    st.markdown(f"**{baslik}**")
 
-                    with col_info:
-                        baslik = row[kolonlar['isim']]
-                        orijinal_baslik = None
-                        if kolonlar['orijinal_isim'] and pd.notna(row[kolonlar['orijinal_isim']]):
-                            orijinal_baslik = row[kolonlar['orijinal_isim']]
+                meta = []
+                if kolonlar['yil'] and pd.notna(row.get(kolonlar['yil'])):
+                    meta.append(str(int(row[kolonlar['yil']])))
+                if kolonlar['tur']:
+                    meta.append(str(row.get(kolonlar['tur'], "")))
+                if meta:
+                    st.text(" • ".join(meta))
 
-                        if orijinal_baslik and str(orijinal_baslik) != str(baslik):
-                            st.markdown(f"**{orijinal_baslik}**")
-                            st.caption(f"{baslik}")
-                        else:
-                            st.markdown(f"**{baslik}**")
-
-                        meta = []
-                        if kolonlar['yil'] and pd.notna(row[kolonlar['yil']]):
-                            meta.append(str(int(row[kolonlar['yil']])))
-
-                        if kolonlar['tur']:
-                            meta.append(str(row[kolonlar['tur']]))
-                        if meta:
-                            st.text(" • ".join(meta))
-
-                    with col_rate:
-                        if kolonlar['puan']:
-                            st.metric("Puan", f"{row[kolonlar['puan']]:.1f}")
+            with col_rate:
+                if kolonlar['puan']:
+                    st.metric("Puan", f"{row[kolonlar['puan']]:.1f}")
 
 def main():
     stil_enjekte_et()
+
     st.title("Film Oylama Analitik Paneli")
     st.markdown("_Veri seti üzerinden dinamik filtreleme ve görsel analiz arayüzü._")
     st.markdown("---")
-
-    view_mode = _get_device_mode()
 
     try:
         ham_df = veri_yukle_cached()
@@ -581,10 +588,9 @@ def main():
         st.error(f"Veri yükleme hatası: {str(e)}")
         return
 
-    st.success(f"Toplam {len(ham_df)} adet film gömülü sistemden başarıyla yüklendi.")
+    st.success(f"Toplam {len(ham_df)} adet içerik başarıyla yüklendi.")
 
     kolon_bilgisi, temiz_df = kolon_tespit_et_cached(ham_df)
-
     if not kolon_bilgisi['puan']:
         st.error("Hata: CSV dosyasında 'Your Rating' kolonu bulunamadı.")
         return
@@ -592,10 +598,10 @@ def main():
     sonuc_df = sidebar_filtreleri(temiz_df, kolon_bilgisi)
 
     if sonuc_df.empty:
-        st.warning("Seçilen filtre kriterlerine uygun film bulunamadı. Lütfen filtreleri gevşetiniz.")
+        st.warning("Seçilen filtre kriterlerine uygun içerik bulunamadı. Lütfen filtreleri gevşetiniz.")
         return
 
-    st.info(f"Şu an filtrelenmiş {len(sonuc_df)} adet film görüntüleniyor.")
+    st.info(f"Şu an filtrelenmiş {len(sonuc_df)} adet içerik görüntüleniyor.")
 
     st.sidebar.markdown("---")
     csv_data = sonuc_df.to_csv(index=False).encode('utf-8')
@@ -604,13 +610,25 @@ def main():
         data=csv_data,
         file_name="filtered_movies.csv",
         mime="text/csv",
-        help="Mevcut filtreleme sonuçlarını CSV dosyası olarak bilgisayarınıza indirir."
+        help="Mevcut filtreleme sonuçlarını CSV dosyası olarak indirir."
     )
 
-    dashboard_metrikleri(sonuc_df, kolon_bilgisi)
-    dashboard_grafikleri(sonuc_df, kolon_bilgisi)
-    st.write("")
-    dashboard_tablolar(sonuc_df, kolon_bilgisi, view_mode)
+    # İSTEDİĞİN SEKME SIRASI:
+    # 1) Top/Bottom 10 (başlangıç)
+    # 2) Tüm Liste
+    # 3) Grafikler
+    tab1, tab2, tab3 = st.tabs(["🏆 En İyi / En Kötü 10", "📚 Tüm Liste", "📊 Grafikler"])
+
+    with tab1:
+        sekme_top_bottom(sonuc_df, kolon_bilgisi)
+
+    with tab2:
+        sekme_tum_liste(sonuc_df, kolon_bilgisi)
+
+    with tab3:
+        dashboard_metrikleri(sonuc_df, kolon_bilgisi)
+        st.write("")
+        dashboard_grafikleri(sonuc_df, kolon_bilgisi)
 
 if __name__ == "__main__":
     main()
